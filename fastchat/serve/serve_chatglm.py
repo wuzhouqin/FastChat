@@ -30,12 +30,13 @@ _COLLECTION_NAME = 'demo'
 _ID_FIELD_NAME = 'sentence_id'
 _VECTOR_FIELD_NAME = 'embedding'
 
-def search(collection, vector_field, id_field, search_vectors):
+def search(collection, vector_field, out_field, search_vectors):
     search_param = {
         "data": search_vectors,
         "anns_field": vector_field,
         "param": {"metric_type": _METRIC_TYPE, "params": {"nprobe": _NPROBE}},
-        "limit": _TOPK}
+        "limit": _TOPK,
+        "output_fields": [out_field]}
         #"expr": "id_field >= 0"}
     results = collection.search(**search_param)
    # print(results)
@@ -44,7 +45,7 @@ def search(collection, vector_field, id_field, search_vectors):
         for j, res in enumerate(result):
             print("Top {}: {}".format(j, res))
     random_idx = random.randint(0, _TOPK-1)
-    return results[0][random_idx].id
+    return results[0][random_idx]
 
 def post_process(text):
     text = text.replace("ChatGLM-6B", "情绪哥")
@@ -114,16 +115,15 @@ def chatglm_generate_stream(model, t2v_models, milvus_collections, sentences, to
         print("embeding", embedding)
         print(f"query:{query}")
         print("sentences len:{}".format(len(sentences)))
-        doc_id = search(milvus_collections[0], _VECTOR_FIELD_NAME, _ID_FIELD_NAME, embedding)
+        doc_id = search(milvus_collections[0], _VECTOR_FIELD_NAME, _ID_FIELD_NAME, embedding).id
         print("selected doc id:{} selected sentence:{}", doc_id, sentences[doc_id])
         inner_response = sentences[doc_id] + "(内部语料)"
     else:
         if education_result == 1:
             education_result = get_education(model, query, tokenizer)
             embeddings = t2v_models[1].encode([query])
-            embedding = embeddings[0]
-            doc_id = search(milvus_collections[1], 'vector', 'id', embedding)
-            # TODO 
+            content = search(milvus_collections[1], 'vector', 'content', embeddings).entity.get('content')
+            query = query + '。请参考接下来给出的内容。' + content
 
     for response, new_hist in model.stream_chat(tokenizer, query, hist):
         if mood_result == 1:
