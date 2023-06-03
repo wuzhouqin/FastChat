@@ -14,6 +14,18 @@ import uuid
 from fastapi import FastAPI, Request, BackgroundTasks
 from fastapi.responses import StreamingResponse
 import requests
+from text2vec import SentenceModel
+
+from pymilvus import (
+    connections,
+    FieldSchema, CollectionSchema, DataType,
+    Collection,
+    utility
+)
+
+_HOST = '127.0.0.1'
+_PORT = '19530'
+
 try:
     from transformers import AutoTokenizer, AutoModelForCausalLM, LlamaTokenizer, AutoModel
 except ImportError:
@@ -53,11 +65,19 @@ class ModelWorker:
         if model_path.endswith("/"):
             model_path = model_path[:-1]
         self.model_name = model_name or model_path.split("/")[-1]
+        print("model name {}".format(model_name))
+        #self.model_name = "mood-13b"
         self.device = device
 
         logger.info(f"Loading the model {self.model_name} on worker {worker_id} ...")
         self.model, self.tokenizer = load_model(
             model_path, device, num_gpus, load_8bit)
+        sentence_model_path = "/home/ubuntu/plm/text2vec-base-chinese"
+        logging.info("loading sentence model:{}".format(sentence_model_path))
+        self.t2v_model = SentenceModel(sentence_model_path, device='cpu')
+        
+        connections.connect(host=_HOST, port=_PORT)
+        self.collection = Collection("demo1")
 
         if hasattr(self.model.config, "max_sequence_length"):
             self.context_len = self.model.config.max_sequence_length
@@ -65,8 +85,13 @@ class ModelWorker:
             self.context_len = self.model.config.max_position_embeddings
         else:
             self.context_len = 2048
-
+        sentence_file = "/home/ubuntu/notebook/text.txt"
+        self.sentences = []
+        with open(sentence_file, "r") as fin:
+            for line in fin:
+                self.sentences.append(line.rstrip("\r\n"))
         is_chatglm = "chatglm" in str(type(self.model)).lower()
+        is_chatglm = True
         if is_chatglm:
             self.generate_stream_func = chatglm_generate_stream
         else:
@@ -127,7 +152,7 @@ class ModelWorker:
 
     def generate_stream_gate(self, params):
         try:
-            for output in self.generate_stream_func(self.model, self.tokenizer,
+            for output in self.generate_stream_func(self.model, self.t2v_model, self.collection, self.sentences, self.tokenizer,
                     params, self.device, self.context_len, args.stream_interval):
                 ret = {
                     "text": output,
@@ -189,7 +214,7 @@ if __name__ == "__main__":
     parser.add_argument("--no-register", action="store_true")
     args = parser.parse_args()
     logger.info(f"args: {args}")
-
+    print(args.controller_address)
     worker = ModelWorker(args.controller_address,
                          args.worker_address,
                          worker_id,
