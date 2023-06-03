@@ -44,7 +44,7 @@ def search(collection, vector_field, out_field, search_vectors):
         print("\nSearch result for {}th vector: ".format(i))
         for j, res in enumerate(result):
             print("Top {}: {}".format(j, res))
-    random_idx = random.randint(0, _TOPK-1)
+    random_idx = random.randint(0, len(results[0]) - 1)
     return results[0][random_idx]
 
 def post_process(text):
@@ -110,20 +110,21 @@ def chatglm_generate_stream(model, t2v_models, milvus_collections, sentences, to
     query = messages[-2][1]
     mood_result = get_mood(model, query, tokenizer)
     logging.warning("mood result:{}".format(mood_result))
-    if mood_result == 1:
-        embedding = [list(t2v_models[0].encode(query))]
-        print("embeding", embedding)
-        print(f"query:{query}")
-        print("sentences len:{}".format(len(sentences)))
-        doc_id = search(milvus_collections[0], _VECTOR_FIELD_NAME, _ID_FIELD_NAME, embedding).id
-        print("selected doc id:{} selected sentence:{}", doc_id, sentences[doc_id])
-        inner_response = sentences[doc_id] + "(内部语料)"
-    else:
-        if education_result == 1:
-            education_result = get_education(model, query, tokenizer)
-            embeddings = t2v_models[1].encode([query])
-            content = search(milvus_collections[1], 'vector', 'content', embeddings).entity.get('content')
-            query = query + '。请参考接下来给出的内容。' + content
+    # if mood_result == 1:
+    #     embedding = [list(t2v_models[0].encode(query))]
+    #     print("embeding", embedding)
+    #     print(f"query:{query}")
+    #     print("sentences len:{}".format(len(sentences)))
+    #     doc_id = search(milvus_collections[0], _VECTOR_FIELD_NAME, _ID_FIELD_NAME, embedding).id
+    #     print("selected doc id:{} selected sentence:{}", doc_id, sentences[doc_id])
+    #     inner_response = sentences[doc_id] + "(内部语料)"
+    # else:
+    education_result = get_education(model, query, tokenizer)
+    logging.warning("education result:{}".format(education_result))
+    if education_result == 1:
+        embeddings = t2v_models[1].encode([query])
+        content = search(milvus_collections[1], 'vector', 'content', embeddings).entity.get('content')
+        query = query + '。请参考接下来给出的内容。' + content
 
     for response, new_hist in model.stream_chat(tokenizer, query, hist):
         if mood_result == 1:
