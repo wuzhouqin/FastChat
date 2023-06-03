@@ -8,6 +8,7 @@ from pymilvus import (
     Collection,
     utility
 )
+from text2vec import SentenceModel
 
 _COLLECTION_NAME = 'demo'
 _ID_FIELD_NAME = 'sentence_id'
@@ -67,16 +68,29 @@ def get_mood(model, query, tokenizer):
     elif result.startswith('是') or result.find('有负面') != -1:
         return 1
     return 0
+
+def get_education(model, query, tokenizer):
+    prompt = query + '。请判断前面的描述是否涉及子女教育问题。'
+    print("prompt:{}".format(prompt))
+    inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
+    outputs = model.generate(inputs.input_ids, max_new_tokens=8)
+    result = tokenizer.batch_decode(outputs)
+    result = result[0][len(prompt):].strip()
+    logging.warning("query: {} mood result:{}".format(query, result))
+    if result.find("不涉及") != -1:
+        return 0
+    else:
+        return 1
     
 
     
 
 
 @torch.inference_mode()
-def chatglm_generate_stream(model, t2v_model, milvus_collection, sentences, tokenizer, params, device,
+def chatglm_generate_stream(model, t2v_models, milvus_collections, sentences, tokenizer, params, device,
                             context_len=2048, stream_interval=2):
     """Generate text using model's chat api"""
-    print(t2v_model)
+    print(t2v_models)
     messages = params["prompt"]
     max_new_tokens = int(params.get("max_new_tokens", 256))
     temperature = float(params.get("temperature", 1.0))
@@ -96,13 +110,20 @@ def chatglm_generate_stream(model, t2v_model, milvus_collection, sentences, toke
     mood_result = get_mood(model, query, tokenizer)
     logging.warning("mood result:{}".format(mood_result))
     if mood_result == 1:
-        embedding = [list(t2v_model.encode(query))]
+        embedding = [list(t2v_models[0].encode(query))]
         print("embeding", embedding)
         print(f"query:{query}")
         print("sentences len:{}".format(len(sentences)))
-        doc_id = search(milvus_collection, _VECTOR_FIELD_NAME, _ID_FIELD_NAME, embedding)
+        doc_id = search(milvus_collections[0], _VECTOR_FIELD_NAME, _ID_FIELD_NAME, embedding)
         print("selected doc id:{} selected sentence:{}", doc_id, sentences[doc_id])
         inner_response = sentences[doc_id] + "(内部语料)"
+    else:
+        if education_result == 1:
+            education_result = get_education(model, query, tokenizer)
+            embeddings = t2v_models[1].encode([query])
+            embedding = embeddings[0]
+            doc_id = search(milvus_collections[1], 'vector', 'id', embedding)
+            # TODO 
 
     for response, new_hist in model.stream_chat(tokenizer, query, hist):
         if mood_result == 1:
