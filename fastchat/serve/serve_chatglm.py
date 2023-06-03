@@ -77,7 +77,7 @@ def get_education(model, query, tokenizer):
     outputs = model.generate(inputs.input_ids, max_new_tokens=8)
     result = tokenizer.batch_decode(outputs)
     result = result[0][len(prompt):].strip()
-    logging.warning("query: {} mood result:{}".format(query, result))
+    logging.warning("query: {} get_education result:{}".format(query, result))
     if result.find("不涉及") != -1:
         return 0
     else:
@@ -125,7 +125,9 @@ def chatglm_generate_stream(model, t2v_models, milvus_collections, sentences, to
         embeddings = t2v_models[1].encode([query])
         content = search(milvus_collections[1], 'vector', 'content', embeddings).entity.get('content')
         query = query + '。请参考接下来给出的内容。' + content
+        logging.warning("education query is:", query)
 
+    inner_response= ''
     for response, new_hist in model.stream_chat(tokenizer, query, hist):
         if mood_result == 1:
             response = inner_response +"\n\n" +response
