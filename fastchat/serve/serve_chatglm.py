@@ -71,7 +71,7 @@ def get_mood(model, query, tokenizer):
     return 0
 
 def get_education(model, query, tokenizer):
-    prompt = query + '。请判断前面的描述是否涉及子女教育问题。'
+    prompt = '请判断下面给出的描述是否涉及子女教育\n回答“涉及”或者“不涉及”\n```'+query+'```\n'
     print("prompt:{}".format(prompt))
     inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
     outputs = model.generate(inputs.input_ids, max_new_tokens=8)
@@ -124,7 +124,7 @@ def chatglm_generate_stream(model, t2v_models, milvus_collections, sentences, to
     if education_result == 1:
         embeddings = t2v_models[1].encode([query])
         content = search(milvus_collections[1], 'vector', 'content', embeddings).entity.get('content')
-        query = query + '。请参考接下来给出的内容。' + content
+        query = '请总结下面给出的内容，尽量简洁，100个字以内。\n\n```' + content + '```'
         logging.warning("education query is:", query)
 
     inner_response= ''
