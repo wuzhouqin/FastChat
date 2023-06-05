@@ -126,11 +126,11 @@ def chatglm_generate_stream(model, t2v_models, milvus_collections, sentences, to
         content = search(milvus_collections[1], 'vector', 'content', embeddings).entity.get('content')
         query = f'''请总结下面内容来回答问题，尽量简洁，50个字以内。材料以“```”开始和结束，问题以“///”开始和结束。
 
-        材料：
-        ```{content}```
-        问题：
-        ///{query}///
-        '''
+材料：
+```{content}```
+问题：
+///{query}///
+'''
         logging.warning("education query is:" + query)
 
     for response, new_hist in model.stream_chat(tokenizer, query, hist):
