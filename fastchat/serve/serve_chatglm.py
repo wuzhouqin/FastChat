@@ -130,9 +130,7 @@ def chatglm_generate_stream(model, t2v_models, milvus_collections, sentences, to
 
     for response, new_hist in model.stream_chat(tokenizer, query, hist):
         if mood_result == 1:
-            response = '''{inner_response}
-
-            {response}'''
+            response = f'{inner_response}\n\n{response}'
         else:
             response = post_process(response)
         output = response
