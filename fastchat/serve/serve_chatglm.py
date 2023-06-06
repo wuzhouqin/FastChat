@@ -133,9 +133,8 @@ def chatglm_generate_stream(model, t2v_models, milvus_collections, sentences, to
             问题:
             ```{query}```
             '''
-
+    logging.warning(f'full query is: {query}, negative emotion:{mood_result}, about education {education_result}')
     for response, new_hist in model.stream_chat(tokenizer, query, hist):
-        logging.warning(f'full query is:{query} \n and the origin response is:{response}')
         if mood_result == 1:
             response = f'{inner_response}\n\n{response}'
         else:
