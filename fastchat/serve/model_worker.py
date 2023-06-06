@@ -74,11 +74,12 @@ class ModelWorker:
             model_path, device, num_gpus, load_8bit)
         sentence_model_path = "/home/ubuntu/plm/text2vec-base-chinese"
         logging.info("loading sentence model:{}".format(sentence_model_path))
-        self.t2v_model = SentenceModel(sentence_model_path, device='cpu')
+        # self.t2v_model = SentenceModel(sentence_model_path, device='cpu')
+        self.t2v_model = SentenceModel('shibing624/text2vec-base-chinese')
         self.books_vec_model = SentenceModel('shibing624/text2vec-base-chinese')
         
         connections.connect(host=_HOST, port=_PORT)
-        self.collection = Collection("demo1")
+        self.mood_collection = Collection("mood")
         self.books_collection = Collection("books_content")
 
         if hasattr(self.model.config, "max_sequence_length"):
@@ -154,7 +155,7 @@ class ModelWorker:
 
     def generate_stream_gate(self, params):
         try:
-            for output in self.generate_stream_func(self.model, [self.t2v_model, self.books_vec_model], [self.collection, self.books_collection], self.sentences, self.tokenizer,
+            for output in self.generate_stream_func(self.model, [self.t2v_model, self.books_vec_model], [self.mood_collection, self.books_collection], self.sentences, self.tokenizer,
                     params, self.device, self.context_len, args.stream_interval):
                 ret = {
                     "text": output,

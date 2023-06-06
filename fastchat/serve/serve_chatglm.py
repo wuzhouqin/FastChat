@@ -55,20 +55,20 @@ def post_process(text):
     return text
 
 def get_mood(model, query, tokenizer):
-    prompt = query + "。请判断上述语句是不是带有负面情绪"
+    prompt = f'''请判断下面给出的描述是否含有负面情绪，请回答“含”或者“不含”。
+    ```
+    {query}
+    ```'''
     print("prompt:{}".format(prompt))
     inputs = tokenizer(prompt, return_tensors="pt").to("cuda")
     outputs = model.generate(inputs.input_ids, max_new_tokens=8)
     result = tokenizer.batch_decode(outputs)
     result = result[0][len(prompt):].strip()
     logging.warning("query: {} mood result:{}".format(query, result))
-    if result.find("无法判断") != -1:
+    if result.find("不含") != -1:
         return 0
-    elif result.find('没有负面') != -1 or result.find('没有') != -1:
-        return 0
-    elif result.startswith('是') or result.find('有负面') != -1:
+    else:
         return 1
-    return 0
 
 def get_education(model, query, tokenizer):
     prompt = '请判断下面给出的描述是否涉及子女教育，\n请回答“涉及”或者“不涉及”\n```\n'+query+'\n```\n'
@@ -110,33 +110,30 @@ def chatglm_generate_stream(model, t2v_models, milvus_collections, sentences, to
     query = messages[-2][1]
     mood_result = get_mood(model, query, tokenizer)
     logging.warning("mood result:{}".format(mood_result))
-    # if mood_result == 1:
-    #     embedding = [list(t2v_models[0].encode(query))]
-    #     print("embeding", embedding)
-    #     print(f"query:{query}")
-    #     print("sentences len:{}".format(len(sentences)))
-    #     doc_id = search(milvus_collections[0], _VECTOR_FIELD_NAME, _ID_FIELD_NAME, embedding).id
-    #     print("selected doc id:{} selected sentence:{}", doc_id, sentences[doc_id])
-    #     inner_response = sentences[doc_id] + "(内部语料)"
-    # else:
-    education_result = get_education(model, query, tokenizer)
-    logging.warning("education result:{}".format(education_result))
-    if education_result == 1:
-        embeddings = t2v_models[1].encode([query])
-        content = search(milvus_collections[1], 'vector', 'content', embeddings).entity.get('content')
-        query = f'''请总结下面的材料内容来回答问题，尽量简洁，50个字以内。材料以“```”开始和结束，问题以“///”开始和结束。
-
-材料：
-```{content}```
-问题：
-///{query}///
-'''
+    if mood_result == 1:
+        embeddings = t2v_models[0].encode([query])
+        content = search(milvus_collections[0], 'vector', 'content', embeddings).entity.get('content')
+        print("selected doc id:{} selected sentence:{}", doc_id, sentences[doc_id])
+        inner_response = content
+    else:
+        education_result = get_education(model, query, tokenizer)
+        logging.warning("education result:{}".format(education_result))
+        if education_result == 1:
+            embeddings = t2v_models[1].encode([query])
+            content = search(milvus_collections[1], 'vector', 'content', embeddings).entity.get('content')
+            query = f'''请总结下面的材料内容来回答问题，尽量简洁，50个字以内。材料以“```”开始和结束，问题以“///”开始和结束。
+            材料：
+            ```{content}```
+            问题：
+            ///{query}///'''
         logging.warning("education query is:" + query)
 
     for response, new_hist in model.stream_chat(tokenizer, query, hist):
-        # if mood_result == 1:
-        #     response = inner_response +"\n\n" +response
-        # else:
-        response = post_process(response)
+        if mood_result == 1:
+            response = '''{inner_response}
+            
+            {response}'''
+        else:
+            response = post_process(response)
         output = response
         yield output
