@@ -114,7 +114,7 @@ def chatglm_generate_stream(model, t2v_models, milvus_collections, sentences, to
         embeddings = t2v_models[0].encode([query])
         content = search(milvus_collections[0], 'vector', 'content', embeddings).entity.get('content')
         print(f"selected sentence:{content}")
-        inner_response = content
+        inner_response = content + '[内部语料]'
     else:
         education_result = get_education(model, query, tokenizer)
         logging.warning("education result:{}".format(education_result))
@@ -126,12 +126,22 @@ def chatglm_generate_stream(model, t2v_models, milvus_collections, sentences, to
             ```{content}```
             问题：
             ///{query}///'''
-        logging.warning("education query is:" + query)
+            logging.warning("education query is:" + query)
+        else:
+            query = f'''
+            请回答下面的问题，尽量简洁，200个字以内。
+            问题:
+            ```{query}```
+            '''
 
     for response, new_hist in model.stream_chat(tokenizer, query, hist):
+        logging.warning(f'full query is:{query} \n and the origin response is:{response}')
         if mood_result == 1:
             response = f'{inner_response}\n\n{response}'
         else:
             response = post_process(response)
+            if education_result == 1:
+                response += '[书籍参考]'
+
         output = response
         yield output
