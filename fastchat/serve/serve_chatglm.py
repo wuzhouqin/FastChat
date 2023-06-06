@@ -113,7 +113,7 @@ def chatglm_generate_stream(model, t2v_models, milvus_collections, sentences, to
     if mood_result == 1:
         embeddings = t2v_models[0].encode([query])
         content = search(milvus_collections[0], 'vector', 'content', embeddings).entity.get('content')
-        print("selected doc id:{} selected sentence:{}", doc_id, sentences[doc_id])
+        print("selected sentence:{}", context_len)
         inner_response = content
     else:
         education_result = get_education(model, query, tokenizer)
@@ -131,7 +131,7 @@ def chatglm_generate_stream(model, t2v_models, milvus_collections, sentences, to
     for response, new_hist in model.stream_chat(tokenizer, query, hist):
         if mood_result == 1:
             response = '''{inner_response}
-            
+
             {response}'''
         else:
             response = post_process(response)
