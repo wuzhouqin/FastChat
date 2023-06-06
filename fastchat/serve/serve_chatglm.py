@@ -113,7 +113,7 @@ def chatglm_generate_stream(model, t2v_models, milvus_collections, sentences, to
     if mood_result == 1:
         embeddings = t2v_models[0].encode([query])
         content = search(milvus_collections[0], 'vector', 'content', embeddings).entity.get('content')
-        print("selected sentence:{}", context_len)
+        print(f"selected sentence:{content}")
         inner_response = content
     else:
         education_result = get_education(model, query, tokenizer)
