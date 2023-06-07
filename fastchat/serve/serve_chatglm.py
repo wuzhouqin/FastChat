@@ -108,13 +108,13 @@ def chatglm_generate_stream(model, t2v_models, milvus_collections, sentences, to
     for i in range(0, len(messages) - 2, 2):
         hist.append((messages[i][1], messages[i+1][1]))
     query = messages[-2][1]
-    mood_result = get_mood(model, query, tokenizer)
-    logging.warning("mood result:{}".format(mood_result))
-
+    
     mood_result = 0
     inner_response = ''
     education_result = 0
-
+    
+    mood_result = get_mood(model, query, tokenizer)
+    logging.warning("mood result:{}".format(mood_result))
     if mood_result == 1:
         embeddings = t2v_models[0].encode([query])
         content = search(milvus_collections[0], 'vector', 'content', embeddings).entity.get('content')
